@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<title>Random Points</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0a0a;
+    --canvas-bg:#000000;
+    --ink:#ffffff;
+    --hair:#2a2a2a;
+    --accent:#ff6a3d;
+    --accent-pink:#ff2fbf;
+    --mono: 'IBM Plex Mono', 'Courier New', monospace;
+    --sans: 'Helvetica Neue', Arial, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0;
+    height:100%;
+    background:var(--bg);
+    font-family:var(--sans);
+    color:var(--ink);
+  }
+  body{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:44px 24px 36px;
+  }
+  .frame{
+    width:100%;
+    max-width:900px;
+  }
+  .canvas-wrap{
+    position:relative;
+    border:1px solid var(--ink);
+    background:var(--canvas-bg);
+    width:100%;
+    aspect-ratio: 4 / 3;
+    overflow:hidden;
+  }
+  .canvas-wrap.inverted{
+    background:#ffffff;
+    border-color:#ffffff;
+  }
+  canvas{
+    display:block;
+    width:100%;
+    height:100%;
+  }
+  .controls{
+    display:flex;
+    align-items:flex-start;
+    gap:36px;
+    margin-top:26px;
+    flex-wrap:wrap;
+  }
+  .param{
+    flex:1 1 140px;
+    min-width:130px;
+    padding-top:2px;
+  }
+  .param-label{
+    display:flex;
+    justify-content:space-between;
+    font-family:var(--mono);
+    font-size:10px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:#777;
+    margin-bottom:8px;
+  }
+  .param-label .param-value{
+    color:var(--accent-pink);
+    letter-spacing:0;
+    text-transform:none;
+    font-size:11px;
+  }
+  input[type="range"]{
+    -webkit-appearance:none;
+    appearance:none;
+    width:100%;
+    height:1px;
+    background:var(--hair);
+    outline:none;
+    margin:0;
+    padding:0;
+  }
+  input[type="range"]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:9px;
+    height:9px;
+    background:var(--accent-pink);
+    cursor:pointer;
+    margin-top:0;
+    transition:transform .12s ease;
+    box-shadow:0 0 6px rgba(255,47,191,0.65);
+  }
+  input[type="range"]::-webkit-slider-thumb:hover{ transform:scale(1.3); }
+  input[type="range"]::-moz-range-thumb{
+    width:9px;
+    height:9px;
+    background:var(--accent-pink);
+    border:none;
+    cursor:pointer;
+    border-radius:0;
+    box-shadow:0 0 6px rgba(255,47,191,0.65);
+  }
+  input[type="range"]::-moz-range-track{
+    height:1px;
+    background:var(--hair);
+  }
+  .param-toggle{
+    flex:0 0 auto;
+    padding-bottom:1px;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .param-toggle label{
+    display:flex;
+    align-items:center;
+    gap:9px;
+    font-family:var(--mono);
+    font-size:10px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:#777;
+    cursor:pointer;
+    user-select:none;
+  }
+  input[type="checkbox"]{
+    -webkit-appearance:none;
+    appearance:none;
+    width:12px;
+    height:12px;
+    border:1px solid var(--ink);
+    background:transparent;
+    margin:0;
+    cursor:pointer;
+  }
+  input[type="checkbox"]:checked{
+    background:var(--accent-pink);
+    border-color:var(--accent-pink);
+    box-shadow:0 0 6px rgba(255,47,191,0.65);
+  }
+  button{
+    flex:0 0 auto;
+    width:140px;
+    text-align:center;
+    font-family:var(--mono);
+    font-size:10px;
+    font-weight:400;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    padding:9px 14px;
+    background:transparent;
+    color:var(--ink);
+    border:1px solid var(--ink);
+    cursor:pointer;
+    transition:background .15s ease, color .15s ease;
+    white-space:nowrap;
+  }
+  button:hover{
+    background:var(--accent-pink);
+    color:#000000;
+    border-color:var(--accent-pink);
+  }
+  button:active{
+    transform:translateY(1px);
+  }
+  .button-stack{
+    flex:0 0 auto;
+    margin-left:auto;
+    align-self:flex-start;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  button.ghost{
+    background:transparent;
+    border:1px solid #444;
+    color:#999;
+    cursor:pointer;
+    text-decoration:none;
+  }
+  button.ghost:hover{
+    color:var(--accent-pink);
+    border-color:var(--accent-pink);
+    background:transparent;
+  }
+</style>
+</head>
+<body>
+
+<div class="frame">
+  <div class="canvas-wrap">
+    <canvas id="cv"></canvas>
+  </div>
+
+  <div class="controls">
+    <div class="param">
+      <div class="param-label"><span>Points</span><span class="param-value" id="countVal">12</span></div>
+      <input type="range" id="countRange" min="2" max="200" value="12">
+    </div>
+    <div class="param">
+      <div class="param-label"><span>Duration</span><span class="param-value" id="durationVal">2200</span></div>
+      <input type="range" id="durationRange" min="600" max="4000" step="100" value="2200">
+    </div>
+    <div class="param-toggle">
+      <label><input type="checkbox" id="showCoords" checked><span>Coordinates</span></label>
+      <label><input type="checkbox" id="showEndpoints" checked><span>Endpoints</span></label>
+      <label><input type="checkbox" id="invertColors"><span>Invert</span></label>
+    </div>
+    <div class="button-stack">
+      <button id="generateBtn">Generate</button>
+      <button id="downloadBtn" class="ghost">Download image</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('cv');
+  const canvasWrap = canvas.parentElement;
+  let ctx = canvas.getContext('2d');
+  const countRange = document.getElementById('countRange');
+  const countVal = document.getElementById('countVal');
+  const durationRange = document.getElementById('durationRange');
+  const durationVal = document.getElementById('durationVal');
+  const showCoordsInput = document.getElementById('showCoords');
+  const showEndpointsInput = document.getElementById('showEndpoints');
+  const invertInput = document.getElementById('invertColors');
+  const generateBtn = document.getElementById('generateBtn');
+  const downloadBtn = document.getElementById('downloadBtn');
+
+  let points = [];
+  let segStyles = [];
+  let pointDist = [0];
+  let totalLength = 0;
+  let animGen = 0;
+  let viewRect = {width:0, height:0};
+  const EDGE_MARGIN = 4;
+
+  // Rolled fresh in every generate() call. These stretch the overall
+  // "mood" of the piece far beyond what per-segment randomness alone
+  // gives: some generates end up calm and sparse, others dense and
+  // wild, some very shape-like, others closer to pure noise — so
+  // consecutive generates actually feel different, not just rotated.
+  let chaosFactor = 1;
+  let weightFactor = 1;
+  let biasFraction = 0.85;
+  let lastTargetDist = 0;
+  let inkRGB = '255,255,255';
+
+  function updateViewRect(){
+    const rect = canvas.getBoundingClientRect();
+    viewRect = {width: rect.width, height: rect.height};
+  }
+
+  let resizeTimer = null;
+  function resizeCanvas(){
+    updateViewRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = viewRect.width * dpr;
+    canvas.height = viewRect.height * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if(points.length){
+      renderFrame(totalLength);
+    }
+  }
+
+  // On a real size change (not just a mobile scroll/keyboard resize event)
+  // the stored point coordinates no longer fit the new canvas, so rebuild
+  // the composition. Debounced so dragging the window stays smooth.
+  function handleResize(){
+    const prevW = viewRect.width, prevH = viewRect.height;
+    updateViewRect();
+    const changed = Math.abs(viewRect.width - prevW) > 1 || Math.abs(viewRect.height - prevH) > 1;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = viewRect.width * dpr;
+    canvas.height = viewRect.height * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if(!points.length) return;
+    if(!changed){
+      renderFrame(totalLength);
+      return;
+    }
+    clearTimeout(resizeTimer);
+    renderFrame(totalLength);
+    resizeTimer = setTimeout(() => {
+      points = randomPoints(parseInt(countRange.value, 10));
+      computeSegments();
+      renderFrame(totalLength);
+    }, 180);
+  }
+
+  function roomAtPoint(p){
+    return Math.max(6, Math.min(p.x, viewRect.width - p.x, p.y, viewRect.height - p.y));
+  }
+
+  function clampToFrame(pt){
+    return {
+      x: Math.min(viewRect.width - EDGE_MARGIN, Math.max(EDGE_MARGIN, pt.x)),
+      y: Math.min(viewRect.height - EDGE_MARGIN, Math.max(EDGE_MARGIN, pt.y))
+    };
+  }
+
+  // A loose, randomly-oriented "spine" arc (like a body gesture) that
+  // point placement is biased toward, tapering at both ends and with an
+  // off-center bulge (a "head"). Points cluster near this instead of
+  // scattering uniformly, so the tangle reads as one cohesive gesture —
+  // almost recognizable as a creature/object — rather than pure noise.
+  // Every generate() call builds a fresh spine, so the "something" it
+  // almost resembles changes each time.
+  function buildSpine(){
+    const w = viewRect.width, h = viewRect.height;
+    const theta = Math.random()*Math.PI*2;
+    const dir = {x: Math.cos(theta), y: Math.sin(theta)};
+    const perp = {x: -Math.sin(theta), y: Math.cos(theta)};
+    // Position and size now roam much more widely — sometimes small and
+    // tucked in a corner, sometimes huge and nearly filling the frame —
+    // instead of always landing as a medium blob near dead-center.
+    const cx = w * (0.18 + Math.random()*0.64);
+    const cy = h * (0.18 + Math.random()*0.64);
+    const maxLen = Math.min(w,h) * 0.95;
+    const L = maxLen * (0.28 + Math.random()*0.72);
+    const pA = {x: cx - dir.x*L/2, y: cy - dir.y*L/2};
+    const pB = {x: cx + dir.x*L/2, y: cy + dir.y*L/2};
+
+    // Two independent bend controls along the spine. When they lean the
+    // same way you get a simple C-curve; when they lean opposite ways
+    // you get an S-curve — so the underlying path shape itself varies,
+    // not just its rotation and size.
+    const bend1 = L * (0.05 + Math.random()*0.40) * (Math.random() < 0.5 ? 1 : -1);
+    const bend2 = L * (0.05 + Math.random()*0.40) * (Math.random() < 0.5 ? 1 : -1);
+    const c1 = {x: pA.x + dir.x*L*0.33 + perp.x*bend1, y: pA.y + dir.y*L*0.33 + perp.y*bend1};
+    const c2 = {x: pA.x + dir.x*L*0.66 + perp.x*bend2, y: pA.y + dir.y*L*0.66 + perp.y*bend2};
+
+    // Pick a width-profile archetype so the silhouette itself differs,
+    // not just its proportions: a single bump near one end, a bump near
+    // both ends (peanut-ish), or a broad even taper (blobbier, rounder).
+    const modeRoll = Math.random();
+    const envelopeMode = modeRoll < 0.35 ? 'single' : (modeRoll < 0.65 ? 'double' : 'wide');
+    const wide = envelopeMode === 'wide';
+
+    return {
+      pA, c1, c2, pB,
+      envelopeMode,
+      baseHalfWidth: wide ? L*(0.11 + Math.random()*0.24) : L*(0.045 + Math.random()*0.22),
+      headBumpFactor: 0.3 + Math.random()*0.55,
+      headPos: envelopeMode === 'double' ? (0.08 + Math.random()*0.08) : (Math.random() < 0.5 ? 0.15 : 0.85),
+      headSpread: 0.06 + Math.random()*0.07,
+      tailBumpFactor: 0.24 + Math.random()*0.45,
+      tailPos: 0.84 + Math.random()*0.08,
+      tailSpread: 0.06 + Math.random()*0.07
+    };
+  }
+
+  function spinePoint(spine, s){ return cubicPoint(spine.pA, spine.c1, spine.c2, spine.pB, s); }
+
+  function spineTangent(spine, s){
+    const s2 = Math.min(1, s+0.001);
+    const p1 = spinePoint(spine, s), p2 = spinePoint(spine, s2);
+    const dx = p2.x-p1.x, dy = p2.y-p1.y;
+    const len = Math.hypot(dx,dy) || 1;
+    return {x: dx/len, y: dy/len};
+  }
+
+  function spineEnvelope(spine, s){
+    const sc = Math.max(0, Math.min(1, s));
+    const core = Math.pow(Math.sin(Math.PI * sc), spine.envelopeMode === 'wide' ? 0.35 : 0.65);
+    let bump = 0;
+    if(spine.envelopeMode === 'single'){
+      bump = spine.headBumpFactor * Math.exp(-Math.pow((sc-spine.headPos)/spine.headSpread, 2));
+    } else if(spine.envelopeMode === 'double'){
+      bump = spine.headBumpFactor * Math.exp(-Math.pow((sc-spine.headPos)/spine.headSpread, 2))
+           + spine.tailBumpFactor * Math.exp(-Math.pow((sc-spine.tailPos)/spine.tailSpread, 2));
+    }
+    return spine.baseHalfWidth * (core*0.8 + bump);
+  }
+
+  function randomPoints(n){
+    const pad = 22;
+    const spine = buildSpine();
+    const spDx = spine.pB.x - spine.pA.x, spDy = spine.pB.y - spine.pA.y;
+    const spLenSq = (spDx*spDx + spDy*spDy) || 1;
+    const pts = [];
+    for(let i=0;i<n;i++){
+      let x, y, s;
+      if(Math.random() < biasFraction){
+        s = Math.random();
+        const sp = spinePoint(spine, s);
+        const tan = spineTangent(spine, s);
+        const nrm = {x: -tan.y, y: tan.x};
+        const halfW = spineEnvelope(spine, s);
+        const across = (Math.random()*2-1) * halfW;
+        const along = (Math.random()*2-1) * halfW * 0.18;
+        x = sp.x + nrm.x*across + tan.x*along;
+        y = sp.y + nrm.y*across + tan.y*along;
+      } else {
+        x = pad + Math.random()*(viewRect.width - pad*2);
+        y = pad + Math.random()*(viewRect.height - pad*2);
+        s = ((x-spine.pA.x)*spDx + (y-spine.pA.y)*spDy) / spLenSq;
+        s = Math.max(0, Math.min(1, s));
+      }
+      x = Math.min(viewRect.width-pad, Math.max(pad, x));
+      y = Math.min(viewRect.height-pad, Math.max(pad, y));
+
+      let dx = 10 + Math.random()*5;
+      let dy = -(8 + Math.random()*8);
+      if(y + dy < 12) dy = 15;
+      if(x + dx > viewRect.width - 96) dx = -92;
+      pts.push({x, y, s, labelDx: dx, labelDy: dy});
+    }
+    // Connect points roughly in the order they sit along the spine
+    // (with a bit of local shuffling) instead of pure random order.
+    // Random order made segments jump between arbitrary pairs anywhere
+    // in the cloud, which got messier the more points you added — this
+    // keeps consecutive connections spatially close so the silhouette
+    // survives at any point count, while still zig-zagging like a scribble.
+    const noise = 0.15;
+    pts.forEach(p => { p.sortKey = p.s + (Math.random()-0.5)*noise; });
+    pts.sort((a,b) => a.sortKey - b.sortKey);
+    return pts;
+  }
+
+  function cubicPoint(p0, c1, c2, p1, t){
+    const mt = 1-t;
+    const a = mt*mt*mt, b = 3*mt*mt*t, c = 3*mt*t*t, d = t*t*t;
+    return {
+      x: a*p0.x + b*c1.x + c*c2.x + d*p1.x,
+      y: a*p0.y + b*c1.y + c*c2.y + d*p1.y
+    };
+  }
+
+  function buildRibbonPath(seg, tStart, tEnd, steps){
+    const topPts = [], botPts = [];
+    for(let i=0;i<=steps;i++){
+      const t = tStart + (tEnd - tStart) * (i/steps);
+      const raw = cubicPoint(seg.p0, seg.c1, seg.c2, seg.p1, t);
+      const t2 = Math.min(1, t + 0.001);
+      const raw2 = cubicPoint(seg.p0, seg.c1, seg.c2, seg.p1, t2);
+      let dx = raw2.x - raw.x, dy = raw2.y - raw.y;
+      const len = Math.hypot(dx,dy) || 1;
+      const nx = -dy/len, ny = dx/len;
+
+      const jitter = seg.jitterAmp * Math.sin(t*seg.jitterFreq*Math.PI*2 + seg.jitterPhase);
+      const pt = { x: raw.x + nx*jitter, y: raw.y + ny*jitter };
+
+      const width = (seg.widthStart + (seg.widthEnd - seg.widthStart) * t) / 2;
+      topPts.push(clampToFrame({x: pt.x + nx*width, y: pt.y + ny*width}));
+      botPts.push(clampToFrame({x: pt.x - nx*width, y: pt.y - ny*width}));
+    }
+    const path = new Path2D();
+    path.moveTo(topPts[0].x, topPts[0].y);
+    for(let i=1;i<topPts.length;i++) path.lineTo(topPts[i].x, topPts[i].y);
+    for(let i=botPts.length-1;i>=0;i--) path.lineTo(botPts[i].x, botPts[i].y);
+    path.closePath();
+    return path;
+  }
+
+  function buildTickPath(base, dir, len, width){
+    const half = len/2;
+    const p0 = {x: base.x - dir.x*half, y: base.y - dir.y*half};
+    const p1 = {x: base.x + dir.x*half, y: base.y + dir.y*half};
+    const nx = -dir.y, ny = dir.x;
+    const w0 = width*0.12, w1 = width*0.5;
+    const a = clampToFrame({x:p0.x+nx*w0, y:p0.y+ny*w0});
+    const b = clampToFrame({x:p1.x+nx*w1, y:p1.y+ny*w1});
+    const c = clampToFrame({x:p1.x-nx*w1, y:p1.y-ny*w1});
+    const d = clampToFrame({x:p0.x-nx*w0, y:p0.y-ny*w0});
+    const path = new Path2D();
+    path.moveTo(a.x,a.y); path.lineTo(b.x,b.y); path.lineTo(c.x,c.y); path.lineTo(d.x,d.y);
+    path.closePath();
+    return path;
+  }
+
+  function computeTangents(){
+    const n = points.length;
+    const tangents = [];
+    for(let i=0;i<n;i++){
+      let dx, dy;
+      if(i === 0){
+        dx = points[1].x - points[0].x;
+        dy = points[1].y - points[0].y;
+      } else if(i === n-1){
+        dx = points[n-1].x - points[n-2].x;
+        dy = points[n-1].y - points[n-2].y;
+      } else {
+        dx = points[i+1].x - points[i-1].x;
+        dy = points[i+1].y - points[i-1].y;
+      }
+      const len = Math.hypot(dx,dy) || 1;
+      tangents.push({x: dx/len, y: dy/len});
+    }
+    return tangents;
+  }
+
+  function randomTension(){
+    const r = Math.random();
+    if(r < 0.32) return (0.02 + Math.random()*0.10) * chaosFactor;
+    if(r < 0.70) return (0.18 + Math.random()*0.45) * chaosFactor;
+    return (0.9 + Math.random()*1.3) * chaosFactor;
+  }
+
+  function computeSegments(){
+    segStyles = [];
+    pointDist = [0];
+    if(points.length < 2) { totalLength = 0; return; }
+
+    const tangents = computeTangents();
+    const tensions = points.map(() => randomTension());
+    const rooms = points.map(p => roomAtPoint(p));
+
+    for(let i=0;i<points.length-1;i++){
+      const p0 = points[i], p1 = points[i+1];
+      const segLen = Math.hypot(p1.x-p0.x, p1.y-p0.y) || 0.001;
+
+      const arm0 = Math.min(segLen * tensions[i], rooms[i] * 0.9);
+      const arm1 = Math.min(segLen * tensions[i+1], rooms[i+1] * 0.9);
+
+      const c1 = { x: p0.x + tangents[i].x * arm0, y: p0.y + tangents[i].y * arm0 };
+      const c2 = { x: p1.x - tangents[i+1].x * arm1, y: p1.y - tangents[i+1].y * arm1 };
+
+      const seg = {
+        p0, p1, c1, c2, length: segLen,
+        widthStart: (0.5 + Math.random()*12.5) * weightFactor,
+        widthEnd: (0.5 + Math.random()*12.5) * weightFactor,
+        opacityStart: 0.5 + Math.random()*0.5,
+        opacityEnd: 0.4 + Math.random()*0.6,
+        blur: Math.random() < Math.min(0.5, 0.2*chaosFactor) ? Math.random()*3 : 0,
+        jitterAmp: (0.4 + Math.random()*2.6) * chaosFactor,
+        jitterFreq: 1.5 + Math.random()*4.5,
+        jitterPhase: Math.random()*Math.PI*2,
+        tickPath: null,
+        tickT: 0,
+        tickOpacity: 0
+      };
+
+      if(Math.random() < Math.min(0.65, 0.32*chaosFactor)){
+        const tt = 0.16 + Math.random()*0.68;
+        const raw = cubicPoint(p0, c1, c2, p1, tt);
+        const raw2 = cubicPoint(p0, c1, c2, p1, Math.min(1, tt+0.001));
+        const tdx = raw2.x-raw.x, tdy = raw2.y-raw.y;
+        const tlen = Math.hypot(tdx,tdy) || 1;
+        let nx = -tdy/tlen, ny = tdx/tlen;
+        const ang = (Math.random()-0.5) * 1.1;
+        const cosA = Math.cos(ang), sinA = Math.sin(ang);
+        const dir = { x: nx*cosA - ny*sinA, y: nx*sinA + ny*cosA };
+        const tickLen = 5 + Math.random()*11;
+        const tickWidth = 0.8 + Math.random()*2.4;
+        seg.tickPath = buildTickPath(raw, dir, tickLen, tickWidth);
+        seg.tickT = tt;
+        seg.tickOpacity = 0.35 + Math.random()*0.5;
+      }
+
+      seg.fullPath = buildRibbonPath(seg, 0, 1, 44);
+      pointDist.push(pointDist[i] + seg.length);
+      segStyles.push(seg);
+    }
+    totalLength = pointDist[pointDist.length-1] || 0;
+  }
+
+  function drawFullSegment(seg){
+    ctx.save();
+    if(seg.blur > 0) ctx.filter = 'blur(' + seg.blur.toFixed(2) + 'px)';
+    const grad = ctx.createLinearGradient(seg.p0.x, seg.p0.y, seg.p1.x, seg.p1.y);
+    grad.addColorStop(0, 'rgba(' + inkRGB + ',' + seg.opacityStart.toFixed(3) + ')');
+    grad.addColorStop(1, 'rgba(' + inkRGB + ',' + seg.opacityEnd.toFixed(3) + ')');
+    ctx.fillStyle = grad;
+    ctx.fill(seg.fullPath);
+    ctx.restore();
+
+    if(seg.tickPath){
+      ctx.save();
+      ctx.fillStyle = 'rgba(' + inkRGB + ',' + seg.tickOpacity.toFixed(3) + ')';
+      ctx.fill(seg.tickPath);
+      ctx.restore();
+    }
+  }
+
+  function drawPartialSegment(seg, t){
+    if(t <= 0) return;
+    const steps = Math.max(4, Math.round(44*t));
+    const path = buildRibbonPath(seg, 0, t, steps);
+    ctx.save();
+    if(seg.blur > 0) ctx.filter = 'blur(' + seg.blur.toFixed(2) + 'px)';
+    const midOpacity = seg.opacityStart + (seg.opacityEnd - seg.opacityStart) * t;
+    const grad = ctx.createLinearGradient(seg.p0.x, seg.p0.y, seg.p1.x, seg.p1.y);
+    grad.addColorStop(0, 'rgba(' + inkRGB + ',' + seg.opacityStart.toFixed(3) + ')');
+    grad.addColorStop(1, 'rgba(' + inkRGB + ',' + midOpacity.toFixed(3) + ')');
+    ctx.fillStyle = grad;
+    ctx.fill(path);
+    ctx.restore();
+
+    if(seg.tickPath && t >= seg.tickT){
+      ctx.save();
+      ctx.fillStyle = 'rgba(' + inkRGB + ',' + seg.tickOpacity.toFixed(3) + ')';
+      ctx.fill(seg.tickPath);
+      ctx.restore();
+    }
+  }
+
+  function drawPointMarker(p, isFirst, isLast){
+    const ink = 'rgb(' + inkRGB + ')';
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 3, 0, Math.PI*2);
+    ctx.fillStyle = ink;
+    ctx.fill();
+    if(!showEndpointsInput.checked) return;
+    if(isFirst){
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 7, 0, Math.PI*2);
+      ctx.strokeStyle = ink;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+    if(isLast){
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 7, 0, Math.PI*2);
+      ctx.strokeStyle = ink;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+  }
+
+  function drawCoordLabel(p, idx){
+    const label = String(idx).padStart(2,'0') + '  x:' + Math.round(p.x) + '  y:' + Math.round(p.y);
+    ctx.font = '9px "IBM Plex Mono", monospace';
+    ctx.fillStyle = 'rgba(' + inkRGB + ',0.62)';
+    ctx.fillText(label, p.x + p.labelDx, p.y + p.labelDy);
+  }
+
+  function renderFrame(targetDist){
+    lastTargetDist = targetDist;
+    ctx.clearRect(0, 0, viewRect.width, viewRect.height);
+    if(points.length === 0) return;
+
+    let activeIdx = segStyles.length;
+    for(let i=0;i<segStyles.length;i++){
+      if(targetDist < pointDist[i+1]){ activeIdx = i; break; }
+    }
+
+    for(let i=0;i<activeIdx;i++){
+      drawFullSegment(segStyles[i]);
+    }
+    if(activeIdx < segStyles.length){
+      const seg = segStyles[activeIdx];
+      const segStart = pointDist[activeIdx];
+      const t = Math.max(0, Math.min(1, (targetDist - segStart) / seg.length));
+      drawPartialSegment(seg, t);
+    }
+
+    const showCoords = showCoordsInput.checked;
+    for(let i=0;i<points.length;i++){
+      if(i === 0 || pointDist[i] <= targetDist){
+        drawPointMarker(points[i], i === 0, i === points.length-1 && targetDist >= totalLength - 0.001);
+        if(showCoords) drawCoordLabel(points[i], i);
+      }
+    }
+  }
+
+  function animate(){
+    animGen++;
+    const myGen = animGen;
+    const duration = Math.max(200, parseInt(durationRange.value, 10) || 2200);
+    const t0 = performance.now();
+
+    function frame(now){
+      if(myGen !== animGen) return;
+      const elapsed = now - t0;
+      const frac = totalLength === 0 ? 1 : Math.min(1, elapsed / duration);
+      renderFrame(frac * totalLength);
+      if(frac < 1){
+        requestAnimationFrame(frame);
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function generate(){
+    const n = parseInt(countRange.value, 10);
+    countVal.textContent = n;
+    const d = parseInt(durationRange.value, 10);
+    durationVal.textContent = d;
+
+    chaosFactor = 0.45 + Math.random()*1.5;
+    weightFactor = 0.5 + Math.random()*1.4;
+    biasFraction = 0.55 + Math.random()*0.43;
+
+    updateViewRect();
+    points = randomPoints(n);
+    computeSegments();
+    animate();
+  }
+
+  countRange.addEventListener('input', () => { countVal.textContent = countRange.value; });
+  durationRange.addEventListener('input', () => { durationVal.textContent = durationRange.value; });
+  showCoordsInput.addEventListener('change', () => { if(points.length) renderFrame(lastTargetDist); });
+  showEndpointsInput.addEventListener('change', () => { if(points.length) renderFrame(lastTargetDist); });
+  invertInput.addEventListener('change', () => {
+    inkRGB = invertInput.checked ? '0,0,0' : '255,255,255';
+    canvasWrap.classList.toggle('inverted', invertInput.checked);
+    if(points.length) renderFrame(lastTargetDist);
+  });
+
+  function downloadPNG(){
+    if(!points.length) return;
+
+    // The on-screen canvas is only as large as its CSS box, so exporting
+    // it directly gives a small, soft bitmap. Instead we re-render the
+    // whole drawing to an offscreen canvas at a high fixed resolution
+    // (target ~4000px on the long edge), so lines stay crisp at any size.
+    const EXPORT_LONG_EDGE = 4000;
+    const longEdge = Math.max(viewRect.width, viewRect.height);
+    const scale = EXPORT_LONG_EDGE / longEdge;
+
+    const out = document.createElement('canvas');
+    out.width = Math.round(viewRect.width * scale);
+    out.height = Math.round(viewRect.height * scale);
+
+    // Point the drawing code at the offscreen context, scaled up so all
+    // the existing viewRect-space coordinates map to the big canvas.
+    const screenCtx = ctx;
+    const octx = out.getContext('2d');
+    octx.setTransform(scale, 0, 0, scale, 0, 0);
+    octx.lineJoin = 'round';
+    octx.lineCap = 'round';
+    ctx = octx;
+
+    renderFrame(totalLength);
+
+    // restore the on-screen context and repaint the live view
+    ctx = screenCtx;
+    renderFrame(lastTargetDist);
+
+    const link = document.createElement('a');
+    link.download = 'scribble-' + Date.now() + '.png';
+    link.href = out.toDataURL('image/png');
+    link.click();
+  }
+
+  generateBtn.addEventListener('click', generate);
+  downloadBtn.addEventListener('click', downloadPNG);
+  window.addEventListener('resize', handleResize);
+  window.addEventListener('keydown', (e) => {
+    if(e.key === 'g' || e.key === 'G') generate();
+  });
+
+  resizeCanvas();
+  generate();
+
+  if(document.fonts && document.fonts.ready){
+    document.fonts.ready.then(() => { if(points.length) renderFrame(lastTargetDist); });
+  }
+})();
+</script>
+
+</body>
+</html>
